@@ -66,9 +66,9 @@ publishing {
 
         // Provide artifacts information requited by Maven Central
         pom {
-            name.set("gqlclient")
-            description.set("Simple GraphQL client for Kotlin Multiplatform")
-            url.set("https://github.com/Vincentvibe3/gqlclient")
+            name.set("anitracklib")
+            description.set("Wrapper over the Anilist and MAL api")
+            url.set("https://github.com/Vincentvibe3/Anitraklib")
 
             licenses {
                 license {
@@ -84,7 +84,7 @@ publishing {
                 }
             }
             scm {
-                url.set("https://github.com/Vincentvibe3/gqlclient")
+                url.set("https://github.com/Vincentvibe3/Anitraklib")
             }
         }
     }
