@@ -5,7 +5,6 @@ import io.github.vincentvibe3.anilist.types.*
 import io.github.vincentvibe3.gqlclient.dsl.*
 import io.github.vincentvibe3.gqlclient.http.GQLClient
 import io.github.vincentvibe3.gqlclient.http.HttpHeader
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.reflect.KProperty
 
@@ -26,8 +25,7 @@ class Anilist {
         const val apiEndpoint = "https://graphql.anilist.co"
     }
 
-    private suspend inline fun <reified T> send(query: Query?=null, mutation: Mutation?=null, filter:@Serializable Any?= buildJsonObject {  }, needAuth:Boolean=true):T{
-        val variables = Json.encodeToJsonElement(filter).jsonObject
+    private suspend inline fun <reified T> send(query: Query?=null, mutation: Mutation?=null, variables:JsonObject= buildJsonObject {  }, needAuth:Boolean=true):T{
         val headers = if (needAuth){
             listOf(
                 HttpHeader("Authorization", "Bearer $token")
@@ -72,23 +70,10 @@ class Anilist {
                 }
             }
         }
-        return send(query)
+        return send<ViewerResult>(query).Viewer
     }
 
-    suspend fun getList(userId: Int): JsonObject {
-        val query = query {
-            field("MediaList") {
-                addArg("userId", Variable("userId", "Int"))
-                field("id")
-            }
-        }
-        val variables = buildJsonObject {
-            put("userId", userId)
-        }
-        return send(query, filter = variables)
-    }
-
-    suspend fun updateProgress(mediaId: Int, progress: Int): ProgressUpdateResult {
+    suspend fun updateProgress(mediaId: Int, progress: Int): ProgressUpdateResult.ProgressUpdate {
         val mutation = mutation {
             field("SaveMediaListEntry") {
                 addArg("mediaId", Variable("mediaId", "Int"))
@@ -103,7 +88,7 @@ class Anilist {
             put("mediaId", mediaId)
             put("progress", progress)
         }
-        return send(mutation = mutation, filter = variables)
+        return send<ProgressUpdateResult>(mutation = mutation, variables = variables).saveMediaListEntry
     }
 
     suspend fun updateAnime(
@@ -146,7 +131,7 @@ class Anilist {
                 field("mediaId")
             }
         }
-         val variables = UpdateAnimeVariables(
+         val variables = Json.encodeToJsonElement(UpdateAnimeVariables(
             mediaId,
             status,
             score,
@@ -162,11 +147,11 @@ class Anilist {
             advancedScores,
             startedAt,
             completedAt
-        )
-        return send(mutation = mutation, filter = variables)
+        )).jsonObject
+        return send<UpdateAnimeResult>(mutation = mutation, variables = variables).SaveMediaListEntry
     }
 
-    suspend fun favorite(id:Int, entryType: FavoriteType): FavoriteResult {
+    suspend fun favorite(id:Int, entryType: FavoriteType): Favourites {
         val mutation = mutation {
             field("ToggleFavourite"){
                 addArg("animeId", Variable("animeId", "Int"))
@@ -218,7 +203,8 @@ class Anilist {
             FavoriteType.STAFF -> FavoriteVariables(staffId = id)
             FavoriteType.STUDIO -> FavoriteVariables(studioId = id)
         }
-        return send(mutation = mutation, filter = variablesObject)
+        val variables = Json.encodeToJsonElement(variablesObject).jsonObject
+        return send<FavoriteResult>(mutation = mutation, variables = variables).toggleFavourite
     }
 
     //Deletes a show, id is not the media
@@ -232,7 +218,7 @@ class Anilist {
         val variables = buildJsonObject {
             put("id", id)
         }
-        return send<JsonObject>(mutation = mutation, filter = variables).jsonPrimitive.boolean
+        return send<JsonObject>(mutation = mutation, variables = variables).jsonPrimitive.boolean
     }
 
     suspend fun page(page:Int, perPage:Int){
@@ -306,7 +292,7 @@ class Anilist {
         popularity_lesser:Int?=null,
         source_in:List<MediaSource>?=null,
         sort: MediaSort?=null
-    ): MediaResult {
+    ): Media? {
         val query = query {
             field("Media"){
                 addArg("id", Variable("id", "Int"))
@@ -636,7 +622,7 @@ class Anilist {
                 field("modNotes")
             }
         }
-        val variables = MediaVariables(
+        val variables = Json.encodeToJsonElement(MediaVariables(
             mediaId,
             idMal,
             startDate,
@@ -703,29 +689,26 @@ class Anilist {
             popularity_lesser,
             source_in,
             sort
-        )
-        return send(query, filter = variables)
+        )).jsonObject
+        return send<MediaResult>(query, variables = variables).Media
     }
 
-    suspend fun getAnimeList(filter:MediaListFilter): MediaResult? {
+    suspend fun getMediaList(filter:MediaListCollectionFilter): MediaListCollection {
         val query = query {
-            field("MediaList"){
-                addArg("id", Variable("id", "Int"))
+            field("MediaListCollection"){
                 addArg("userId", Variable("userId", "Int"))
                 addArg("userName", Variable("userName", "String"))
                 addArg("type", Variable("type", "MediaType"))
-                addArg("mediaId", Variable("mediaId", "Int"))
-                addArg("isFollowing", Variable("isFollowing", "Boolean"))
+                addArg("status", Variable("status", "MediaListStatus"))
                 addArg("notes", Variable("notes", "String"))
                 addArg("startedAt", Variable("startedAt", "FuzzyDateInt"))
                 addArg("completedAt", Variable("completedAt", "FuzzyDateInt"))
-                addArg("compareWithAuthList", Variable("compareWithAuthList", "Boolean"))
-                addArg("userId_in", Variable("userId_in", "[Int]"))
+                addArg("forceSingleCompletedList", Variable("forceSingleCompletedList", "Boolean"))
+                addArg("chunk", Variable("chunk", "Int"))
+                addArg("perChunk", Variable("perChunk", "Int"))
                 addArg("status_in", Variable("status_in", "[MediaListStatus]"))
                 addArg("status_not_in", Variable("status_not_in", "[MediaListStatus]"))
                 addArg("status_not", Variable("status_not", "MediaListStatus"))
-                addArg("mediaId_in", Variable("mediaId_in", "[Int]"))
-                addArg("mediaId_not_in", Variable("mediaId_not_in", "[Int]"))
                 addArg("notes_like", Variable("notes_like", "String"))
                 addArg("startedAt_greater", Variable("startedAt_greater", "FuzzyDateInt"))
                 addArg("startedAt_lesser", Variable("startedAt_lesser", "FuzzyDateInt"))
@@ -734,52 +717,82 @@ class Anilist {
                 addArg("completedAt_lesser", Variable("completedAt_lesser", "FuzzyDateInt"))
                 addArg("completedAt_like", Variable("completedAt_like", "String"))
                 addArg("sort", Variable("sort", "[MediaListSort]"))
-                field("id")
-                field("userId")
-                field("mediaId")
-                field("status")
-                field("score")
-                field("progress")
-                field("progressVolumes")
-                field("repeat")
-                field("priority")
-                field("private")
-                field("notes")
-                field("hiddenFromStatusLists")
-                field("customLists")
-                field("advancedScores")
-                field("startedAt")
-                field("completedAt")
-                field("updatedAt")
-                field("createdAt")
-                field("media"){
-                    field("id")
-                    field("title"){
-                        field("romaji"){
-                            addArg("stylised", "true")
+                field("lists"){
+                    field("entries"){
+                        field("id")
+                        field("userId")
+                        field("mediaId")
+                        field("status")
+                        field("score")
+                        field("progress")
+                        field("progressVolumes")
+                        field("repeat")
+                        field("priority")
+                        field("private")
+                        field("notes")
+                        field("hiddenFromStatusLists")
+                        field("customLists")
+                        field("advancedScores")
+                        field("startedAt"){
+                            field("year")
+                            field("month")
+                            field("day")
                         }
-                        field("english"){
-                            addArg("stylised", "true")
+                        field("completedAt"){
+                            field("year")
+                            field("month")
+                            field("day")
                         }
-                        field("native"){
-                            addArg("stylised", "true")
+                        field("updatedAt")
+                        field("createdAt")
+                        field("media"){
+                            field("id")
+                            field("title"){
+                                field("romaji"){
+                                    addArg("stylised", "true")
+                                }
+                                field("english"){
+                                    addArg("stylised", "true")
+                                }
+                                field("native"){
+                                    addArg("stylised", "true")
+                                }
+                                field("userPreferred")
+                            }
+                            field("coverImage"){
+                                field("extraLarge")
+                                field("large")
+                                field("medium")
+                                field("color")
+                            }
                         }
-                        field("userPreferred")
                     }
-                    field("coverImage"){
-                        field("extraLarge")
-                        field("large")
-                        field("medium")
-                        field("color")
+                    field("name")
+                    field("isCustomList")
+                    field("isSplitCompletedList")
+                    field("status")
+                }
+                field("user"){
+                    field("id")
+                    field("name")
+                    field("mediaListOptions"){
+                        field("scoreFormat")
+                        field("animeList"){
+                            field("customLists")
+                        }
+                        field("mangaList"){
+                            field("customLists")
+                        }
                     }
                 }
-                field("user")
+                field("hasNextChunk")
             }
         }
-        return send(query, filter=filter)
+        val variables = Json.encodeToJsonElement(filter).jsonObject
+        return send<MediaListCollectionResult>(query, variables = variables).MediaListCollection
     }
 
-    suspend fun setStatus(mediaId:Int, status:MediaListStatus): MediaList? {
+    suspend fun setStatus(mediaId:Int, status:MediaListStatus): MediaList {
         return updateAnime(mediaId, status)
     }
 }

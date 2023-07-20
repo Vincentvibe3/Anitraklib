@@ -90,10 +90,10 @@ data class Media(
 
     @Serializable
     data class MediaStreamingEpisode(
-        val title:String,
-        val thumbnail: String,
-        val url:String,
-        val site:String
+        val title:String?,
+        val thumbnail: String?,
+        val url:String?,
+        val site:String?
     )
 
     @Serializable
@@ -112,18 +112,18 @@ data class Media(
 
     @Serializable
     data class MediaCoverImage(
-        val extraLarge:String,
-        val large:String,
-        val medium:String,
-        val color:String
+        val extraLarge:String?,
+        val large:String?,
+        val medium:String?,
+        val color:String?
     )
 
     @Serializable
     data class MediaTitle(
-        val romaji:String?=null,
-        val english:String?=null,
-        val native:String?=null,
-        val userPreferred:String?=null
+        val romaji:String?,
+        val english:String?,
+        val native:String?,
+        val userPreferred:String?
     )
 
     @Serializable

@@ -23,7 +23,7 @@ data class MediaList(
     val advancedScores:JsonObject?=null,
     val startedAt:FuzzyDateInt?=null,
     val completedAt:FuzzyDateInt?=null,
-    val updatedAtLInt: Int?=null,
+    val updatedAt: Int?=null,
     val createdAt:Int?=null,
     val media:Media?=null,
     val user: AnilistUser?=null
