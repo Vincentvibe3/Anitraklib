@@ -747,6 +747,8 @@ class Anilist {
                         field("createdAt")
                         field("media"){
                             field("id")
+                            field("episodes")
+                            field("chapters")
                             field("title"){
                                 field("romaji"){
                                     addArg("stylised", "true")
