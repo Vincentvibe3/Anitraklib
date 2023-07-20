@@ -1,4 +1,7 @@
 package io.github.vincentvibe3.anilist
 
-class AnilistRequestException(override val message:String, val errorData:List<AnilistGQLError>): Exception() {
-}
+class AnilistRequestException(val errorData:List<AnilistGQLError>):Exception(
+    errorData.joinToString(", ") {
+        "Message: ${it.message}"
+    }
+)

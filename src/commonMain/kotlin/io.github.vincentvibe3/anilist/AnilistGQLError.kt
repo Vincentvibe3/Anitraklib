@@ -7,10 +7,9 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 class AnilistGQLError(
     override val extensions: JsonObject?=null,
-    override val locations: List<GQLError.ErrorLocations>?,
+    override val locations: List<GQLError.ErrorLocations>?=null,
     override val message: String,
     override val path: List<String>?=null,
     val validation:JsonObject?=null,
     val status:Int
-) :GQLError {
-}
+) :GQLError

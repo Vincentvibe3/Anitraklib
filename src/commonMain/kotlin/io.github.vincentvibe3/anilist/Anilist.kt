@@ -1,52 +1,59 @@
 package io.github.vincentvibe3.anilist
 
-import io.github.vincentvibe3.anilist.serialization.AnilistUser
-import io.github.vincentvibe3.anilist.serialization.FavoriteVariables
-import io.github.vincentvibe3.anilist.serialization.FuzzyDateInput
-import io.github.vincentvibe3.anilist.serialization.UpdateAnimeVariables
+import io.github.vincentvibe3.anilist.serialization.*
 import io.github.vincentvibe3.anilist.types.*
-import io.github.vincentvibe3.gqlclient.dsl.Variable
-import io.github.vincentvibe3.gqlclient.dsl.mutation
-import io.github.vincentvibe3.gqlclient.dsl.query
-import io.github.vincentvibe3.gqlclient.http.DefaultGQLError
+import io.github.vincentvibe3.gqlclient.dsl.*
 import io.github.vincentvibe3.gqlclient.http.GQLClient
 import io.github.vincentvibe3.gqlclient.http.HttpHeader
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.reflect.KProperty
 
 class Anilist {
 
     var token = ""
+    var id = ""
+    val oAuthEndpoint by OAuthDelegate()
+
+    class OAuthDelegate{
+        operator fun getValue(anilist: Anilist, property: KProperty<*>): Any {
+            return "https://anilist.co/api/v2/oauth/authorize?client_id=${anilist.id}&response_type=token"
+        }
+    }
 
     companion object {
         val gqlclient = GQLClient()
         const val apiEndpoint = "https://graphql.anilist.co"
-        const val oauthEndpoint = "https://anilist.co/api/v2/oauth/authorize?client_id=13282&response_type=token"
     }
 
-    suspend fun getAnime(id: Long) {
-        val query = query {
-            field("Media") {
-                addArg("id", Variable("animeId", "Int"))
-                field("id")
-                field("title") {
-                    field("english")
-                }
-                field("episodes")
-                field("genres")
-                field("status")
-                field("format")
-                field("averageScore")
-                field("popularity")
-            }
+    private suspend inline fun <reified T> send(query: Query?=null, mutation: Mutation?=null, filter:@Serializable Any?= buildJsonObject {  }, needAuth:Boolean=true):T{
+        val variables = Json.encodeToJsonElement(filter).jsonObject
+        val headers = if (needAuth){
+            listOf(
+                HttpHeader("Authorization", "Bearer $token")
+            )
+        } else {
+            listOf()
         }
-        val variables = buildJsonObject {
-            put("animeId", id)
+        val result = if (mutation != null) {
+            gqlclient.sendMutation<T, AnilistGQLError>(
+                apiEndpoint, mutation, variables, headers = headers
+            )
+        } else if (query!=null){
+            gqlclient.sendQuery<T, AnilistGQLError>(
+                apiEndpoint, query, variables, headers = headers
+            )
+        } else {
+            null
         }
-        val response = gqlclient.sendQuery<JsonObject, DefaultGQLError>(apiEndpoint, query, variables)
-        println(response.data.toString())
+        return if (result!=null) {
+            result.data ?: throw AnilistRequestException(result.errors!!)
+        } else {
+            throw IllegalStateException("You must pass either a query or mutation")
+        }
     }
 
-    suspend fun getCurrentUser(): AnilistUser? {
+    suspend fun getCurrentUser(): AnilistUser {
         val query = query {
             field("Viewer") {
                 field("id")
@@ -65,22 +72,10 @@ class Anilist {
                 }
             }
         }
-        val result = gqlclient.sendQuery<AnilistUser, AnilistGQLError>(
-            apiEndpoint, query, headers = listOf(
-                HttpHeader("Authorization", "Bearer $token")
-            )
-        )
-        val errors = result.errors
-        if (result.data==null&&errors!=null){
-            val errorMessages = errors.joinToString {
-                "Message: ${it.message}"
-            }
-            throw AnilistRequestException(errorMessages, errors)
-        }
-        return result.data
+        return send(query)
     }
 
-    suspend fun getList(userId: Int): JsonObject? {
+    suspend fun getList(userId: Int): JsonObject {
         val query = query {
             field("MediaList") {
                 addArg("userId", Variable("userId", "Int"))
@@ -90,19 +85,10 @@ class Anilist {
         val variables = buildJsonObject {
             put("userId", userId)
         }
-        val result = gqlclient.sendQuery<JsonObject, AnilistGQLError>(
-            apiEndpoint, query, variables, headers = listOf(
-                HttpHeader("Authorization", "Bearer $token")
-            )
-        )
-        result.errors?.forEach {
-            println(it.message)
-            println(it.validation.toString())
-        }
-        return result.data
+        return send(query, filter = variables)
     }
 
-    suspend fun updateProgress(mediaId: Int, progress: Int) {
+    suspend fun updateProgress(mediaId: Int, progress: Int): ProgressUpdateResult {
         val mutation = mutation {
             field("SaveMediaListEntry") {
                 addArg("mediaId", Variable("mediaId", "Int"))
@@ -117,21 +103,12 @@ class Anilist {
             put("mediaId", mediaId)
             put("progress", progress)
         }
-        val result = gqlclient.sendMutation<JsonObject, AnilistGQLError>(
-            apiEndpoint, mutation, variables, headers = listOf(
-                HttpHeader("Authorization", "Bearer $token")
-            )
-        )
-        result.errors?.forEach {
-            println(it.message)
-            println(it.validation.toString())
-        }
-        println(result.data.toString())
+        return send(mutation = mutation, filter = variables)
     }
 
     suspend fun updateAnime(
         mediaId: Int,
-        status: String? = null,
+        status: MediaListStatus? = null,
         score: Float? = null,
         scoreRaw: Int? = null,
         progress: Int? = null,
@@ -143,9 +120,9 @@ class Anilist {
         hiddenFromStatusLists: Boolean? = null,
         customLists: List<String>? = null,
         advancedScores: List<Float>? = null,
-        startedAt: FuzzyDateInput? = null,
-        completedAt: FuzzyDateInput? = null,
-    ) {
+        startedAt: FuzzyDateInt? = null,
+        completedAt: FuzzyDateInt? = null,
+    ): MediaList {
         val mutation = mutation {
             field("SaveMediaListEntry") {
                 addArg("mediaId", Variable("mediaId", "Int"))
@@ -169,7 +146,7 @@ class Anilist {
                 field("mediaId")
             }
         }
-         val variables = Json.encodeToJsonElement(UpdateAnimeVariables(
+         val variables = UpdateAnimeVariables(
             mediaId,
             status,
             score,
@@ -185,44 +162,11 @@ class Anilist {
             advancedScores,
             startedAt,
             completedAt
-        )).jsonObject
-//        val variables = buildJsonObject {
-//            put("mediaId", mediaId)
-//            status?.let{ put("status", it) }
-//            score?.let { put("score", it) }
-//            scoreRaw?.let { put("scoreRaw", it) }
-//            progress?.let { put("progress", it) }
-//            progressVolumes?.let { put("progressVolumes", it) }
-//            repeat?.let { put("repeat", it) }
-//            priority?.let { put("priority", it) }
-//            private?.let { put("private", it) }
-//            notes?.let { put("notes", it) }
-//            hiddenFromStatusLists?.let{ put("hiddenFromStatusLists", it) }
-//            customLists?.let { putJsonArray("customLists") {
-//                it.forEach { add(it) }
-//            } }
-//            advancedScores?.let { putJsonArray("advancedScores") {
-//                it.forEach { add(it) }
-//            } }
-//            startedAt?.let { putJsonObject("startedAt"){
-//                it.day?.let { day -> put("day", day) }
-//                it.month?.let { month -> put("month", month) }
-//                it.year?.let { year -> put("year", year) }
-//            } }
-//            completedAt?.let { putJsonObject("completedAt"){
-//                it.day?.let { day -> put("day", day) }
-//                it.month?.let { month -> put("month", month) }
-//                it.year?.let { year -> put("year", year) }
-//            } }
-//        }
-        val result = gqlclient.sendMutation<JsonObject, AnilistGQLError>(
-            apiEndpoint, mutation, variables, headers = listOf(
-                HttpHeader("Authorization", "Bearer $token")
-            )
         )
+        return send(mutation = mutation, filter = variables)
     }
 
-    suspend fun favorite(id:Int, entryType: FavoriteType): String {
+    suspend fun favorite(id:Int, entryType: FavoriteType): FavoriteResult {
         val mutation = mutation {
             field("ToggleFavourite"){
                 addArg("animeId", Variable("animeId", "Int"))
@@ -274,25 +218,12 @@ class Anilist {
             FavoriteType.STAFF -> FavoriteVariables(staffId = id)
             FavoriteType.STUDIO -> FavoriteVariables(studioId = id)
         }
-        val variables = Json.encodeToJsonElement(variablesObject).jsonObject
-        val result = gqlclient.sendMutation<FavoriteResult, AnilistGQLError>(
-            apiEndpoint, mutation, variables, headers = listOf(
-                HttpHeader("Authorization", "Bearer $token")
-            )
-        )
-        val error = result.errors
-        if (result.data==null&&error!=null){
-            val errorMessages = error.joinToString {
-                "Message: ${it.message}"
-            }
-            throw AnilistRequestException(errorMessages, error)
-        }
-        return result.data.toString()
+        return send(mutation = mutation, filter = variablesObject)
     }
 
     //Deletes a show, id is not the media
     suspend fun deleteMedia(id: Int): Boolean {
-        val query = mutation {
+        val mutation = mutation {
             field("DeleteMediaListEntry") {
                 addArg("id", Variable("id", "Int"))
                 field("deleted")
@@ -301,114 +232,554 @@ class Anilist {
         val variables = buildJsonObject {
             put("id", id)
         }
-        val result = gqlclient.sendMutation<JsonObject, AnilistGQLError>(
-            apiEndpoint, query, variables, headers = listOf(
-                HttpHeader("Authorization", "Bearer $token")
-            )
-        )
-        val error = result.errors
-        if (result.data==null&&error!=null){
-            val errorMessages = error.joinToString {
-                "Message: ${it.message}"
-            }
-            throw AnilistRequestException(errorMessages, error)
-        }
-        return result.data?.get("deleted")?.jsonPrimitive?.boolean ?: false
+        return send<JsonObject>(mutation = mutation, filter = variables).jsonPrimitive.boolean
     }
 
     suspend fun page(page:Int, perPage:Int){
 
     }
 
-    suspend fun getShow(
+    suspend fun getMedia(
         mediaId: Int,
-        idMal:Int,
-        startDate:Int,
-        endDateInput: Int,
-        season: MediaSeason,
-        seasonYear:Int,
-        type: MediaType,
-        format: MediaFormat,
-        status: MediaStatus,
-        episodes:Int,
-        duration:Int,
-        chapters:Int,
-        volumes:Int,
-        isAdult:Boolean,
-        genre:String,
-        tag:String,
-        minimumTagRank:Int,
-        tagCategory:String,
-        onList:Boolean,
-        licensedBy:String,
-        licensedById: String,
-        averageScore: Int,
-        popularity: Int,
-        source: MediaSource,
-        countryOfOrigin:String,
-        isLicensed:Boolean,
-        search:String,
-        id_not:Int,
-        id_in:List<Int>,
-        id_not_in:List<Int>,
-        idMal_in:List<Int>,
-        idMal_not_in:List<Int>,
-        startDate_greater: Int,
-        startDate_lesser: Int,
-        startDate_like:Int,
-        endDate_greater:Int,
-        endDate_lesser:Int,
-        endDate_like:String,
-        format_in: MediaFormat,
-        format_not: MediaFormat,
-        format_not_in: MediaFormat,
-        status_in: MediaStatus,
-        status_not: MediaStatus,
-        status_not_in:List<MediaStatus>,
-        episodes_greater:Int,
-        duration_greater:Int,
-        duration_lesser:Int,
-        chapters_greater:Int,
-        chapters_lesser:Int,
-        volumes_greater:Int,
-        volumes_lesser:Int,
-        genre_in:List<String>,
-        genre_not_in:List<String>,
-        tag_in:List<String>,
-        tag_not_in:List<String>,
-        tagCategory_in: List<String>,
-        tagCategory_not_in: List<String>,
-        licensedById_in:List<Int>,
-        averageScore_not: Int,
-        averageScore_greater:Int,
-        averageScore_lesser: Int,
-        popularity_not: Int,
-        popularity_greater: Int,
-        popularity_lesser:Int,
-        source_in:List<MediaSource>,
-        sort: MediaSort
-    ): Boolean {
-        val query = mutation {
-            field("DeleteMediaListEntry") {
+        idMal:Int?=null,
+        startDate:Int?=null,
+        endDateInput: Int?=null,
+        season: MediaSeason?=null,
+        seasonYear:Int?=null,
+        type: MediaType?=null,
+        format: MediaFormat?=null,
+        status: MediaStatus?=null,
+        episodes:Int?=null,
+        duration:Int?=null,
+        chapters:Int?=null,
+        volumes:Int?=null,
+        isAdult:Boolean?=null,
+        genre:String?=null,
+        tag:String?=null,
+        minimumTagRank:Int?=null,
+        tagCategory:String?=null,
+        onList:Boolean?=null,
+        licensedBy:String?=null,
+        licensedById: String?=null,
+        averageScore: Int?=null,
+        popularity: Int?=null,
+        source: MediaSource?=null,
+        countryOfOrigin:String?=null,
+        isLicensed:Boolean?=null,
+        search:String?=null,
+        id_not:Int?=null,
+        id_in:List<Int>?=null,
+        id_not_in:List<Int>?=null,
+        idMal_in:List<Int>?=null,
+        idMal_not_in:List<Int>?=null,
+        startDate_greater: Int?=null,
+        startDate_lesser: Int?=null,
+        startDate_like:Int?=null,
+        endDate_greater:Int?=null,
+        endDate_lesser:Int?=null,
+        endDate_like:String?=null,
+        format_in: MediaFormat?=null,
+        format_not: MediaFormat?=null,
+        format_not_in: MediaFormat?=null,
+        status_in: MediaStatus?=null,
+        status_not: MediaStatus?=null,
+        status_not_in:List<MediaStatus>?=null,
+        episodes_greater:Int?=null,
+        duration_greater:Int?=null,
+        duration_lesser:Int?=null,
+        chapters_greater:Int?=null,
+        chapters_lesser:Int?=null,
+        volumes_greater:Int?=null,
+        volumes_lesser:Int?=null,
+        genre_in:List<String>?=null,
+        genre_not_in:List<String>?=null,
+        tag_in:List<String>?=null,
+        tag_not_in:List<String>?=null,
+        tagCategory_in: List<String>?=null,
+        tagCategory_not_in: List<String>?=null,
+        licensedById_in:List<Int>?=null,
+        averageScore_not: Int?=null,
+        averageScore_greater:Int?=null,
+        averageScore_lesser: Int?=null,
+        popularity_not: Int?=null,
+        popularity_greater: Int?=null,
+        popularity_lesser:Int?=null,
+        source_in:List<MediaSource>?=null,
+        sort: MediaSort?=null
+    ): MediaResult {
+        val query = query {
+            field("Media"){
                 addArg("id", Variable("id", "Int"))
-                field("deleted")
+                addArg("idMal", Variable("idMal", "Int"))
+                addArg("startDate", Variable("startDate", "FuzzyDateInt"))
+                addArg("endDate", Variable("endDate", "FuzzyDateInt"))
+                addArg("season", Variable("season", "MediaSeason"))
+                addArg("seasonYear", Variable("seasonYear", "Int"))
+                addArg("type", Variable("type", "MediaType"))
+                addArg("format", Variable("format", "MediaFormat"))
+                addArg("status", Variable("status","MediaStatus"))
+                addArg("episodes", Variable("episodes","Int"))
+                addArg("duration", Variable("duration","Int"))
+                addArg("chapters", Variable("chapters","Int"))
+                addArg("volumes", Variable("volumes","Int"))
+                addArg("isAdult", Variable("isAdult","Boolean"))
+                addArg("genre", Variable("genre","String"))
+                addArg("tag", Variable("tag","String"))
+                addArg("minimumTagRank", Variable("minimumTagRank","Int"))
+                addArg("tagCategory", Variable("tagCategory","String"))
+                addArg("onList", Variable("onList","Boolean"))
+                addArg("licensedBy", Variable("licensedBy","String"))
+                addArg("licensedById", Variable("licensedById","Int"))
+                addArg("averageScore", Variable("averageScore","Int"))
+                addArg("popularity", Variable("popularity","Int"))
+                addArg("source", Variable("source","MediaSource"))
+                addArg("countryOfOrigin", Variable("countryOfOrigin","CountryCode"))
+                addArg("isLicensed", Variable("isLicensed","Boolean"))
+                addArg("search", Variable("search","String"))
+                addArg("id_not", Variable("id_not","Int"))
+                addArg("id_in", Variable("id_in","[Int]"))
+                addArg("id_not_in", Variable("id_not_in","[Int]"))
+                addArg("idMal_not", Variable("idMal_not","Int"))
+                addArg("idMal_in", Variable("idMal_in","[Int]"))
+                addArg("idMal_not_in", Variable("id_in","[Int]"))
+                addArg("startDate_greater", Variable("startDate_greater","FuzzyDateInt"))
+                addArg("startDate_lesser", Variable("startDate_lesser","FuzzyDateInt"))
+                addArg("startDate_like", Variable("startDate_like","String"))
+                addArg("endDate_greater", Variable("endDate_greater","FuzzyDateInt"))
+                addArg("endDate_lesser", Variable("endDate_lesser","FuzzyDateInt"))
+                addArg("endDate_like", Variable("endDate_like","String"))
+                addArg("format_in", Variable("format_in","[MediaFormat]"))
+                addArg("format_not", Variable("format_not","MediaFormat"))
+                addArg("format_not_in", Variable("format_not_in","[MediaFormat]"))
+                addArg("status_in", Variable("status_in","[MediaStatus]"))
+                addArg("status_not", Variable("status_not"," MediaStatus"))
+                addArg("status_not_in", Variable("status_not_in","[MediaStatus]"))
+                addArg("episodes_greater", Variable("episodes_greater","Int"))
+                addArg("duration_greater", Variable("duration_greater","Int"))
+                addArg("duration_lesser", Variable("duration_lesser","Int"))
+                addArg("chapters_greater", Variable("chapters_greater","Int"))
+                addArg("chapters_lesser", Variable("chapters_lesser","Int"))
+                addArg("volumes_greater", Variable("volumes_greater","Int"))
+                addArg("volumes_lesser", Variable("volumes_lesser","Int"))
+                addArg("genre_in", Variable("genre_in","[String]"))
+                addArg("genre_not_in", Variable("genre_not_in","[String]"))
+                addArg("tag_in", Variable("tag_in","[String]"))
+                addArg("tag_not_in", Variable("tag_not_in","[String]"))
+                addArg("tagCategory_in", Variable("tagCategory_in","[String]"))
+                addArg("tagCategory_not_in", Variable("tagCategory_not_in","[String]"))
+                addArg("licensedById_in", Variable("licensedById_in","[Int]"))
+                addArg("averageScore_not", Variable("averageScore_not"," Int"))
+                addArg("averageScore_greater", Variable("averageScore_greater","Int"))
+                addArg("averageScore_lesser", Variable("averageScore_lesser"," Int"))
+                addArg("popularity_not", Variable("popularity_not"," Int"))
+                addArg("popularity_greater", Variable("popularity_greater"," Int"))
+                addArg("popularity_lesser", Variable("popularity_lesser","Int"))
+                addArg("source_in", Variable("source_in","[MediaSource]"))
+                addArg("sort", Variable("sort","[MediaSort]"))
+                field("id")
+                field("idMal")
+                field("title"){
+                    field("romaji"){
+                        addArg("stylised", "true")
+                    }
+                    field("english"){
+                        addArg("stylised", "true")
+                    }
+                    field("native"){
+                        addArg("stylised", "true")
+                    }
+                    field("userPreferred")
+                }
+                field("type")
+                field("format")
+                field("status")
+                field("description")
+                field("startDate"){
+                    field("year")
+                    field("month")
+                    field("day")
+                }
+                field("endDate"){
+                    field("year")
+                    field("month")
+                    field("day")
+                }
+                field("season")
+                field("seasonYear")
+                field("seasonInt")
+                field("episodes")
+                field("duration")
+                field("chapters")
+                field("volumes")
+                field("countryOfOrigin")
+                field("isLicensed")
+                field("source")
+                field("hashtag")
+                field("trailer"){
+                    field("id")
+                    field("site")
+                    field("thumbnail")
+                }
+                field("updatedAt")
+                field("coverImage"){
+                    field("extraLarge")
+                    field("large")
+                    field("medium")
+                    field("color")
+                }
+                field("bannerImage")
+                field("genres")
+                field("synonyms")
+                field("averageScore")
+                field("meanScore")
+                field("popularity")
+                field("isLocked")
+                field("trending")
+                field("favourites")
+                field("tags"){
+                    field("id")
+                    field("name")
+                    field("isAdult")
+                    field("isMediaSpoiler")
+                    field("isGeneralSpoiler")
+                    field("rank")
+                    field("category")
+                    field("description")
+                }
+                field("relations"){
+                    field("nodes"){
+                        field("id")
+                        field("title"){
+                            field("romaji")
+                            field("english")
+                            field("native")
+                            field("userPreferred")
+                        }
+                    }
+                    field("pageInfo"){
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
+                field("characters"){
+                    field("nodes"){
+                        field("id")
+                        field("name"){
+                            field("first")
+                            field("middle")
+                            field("last")
+                            field("full")
+                            field("native")
+                            field("userPreferred")
+                        }
+                    }
+                    field("pageInfo"){
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
+                field("staff"){
+                    field("nodes"){
+                        field("id")
+                        field("name"){
+                            field("first")
+                            field("middle")
+                            field("last")
+                            field("full")
+                            field("native")
+                            field("userPreferred")
+                        }
+                    }
+                    field("pageInfo"){
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
+                field("studios"){
+                    field("nodes"){
+                        field("id")
+                        field("name")
+                    }
+                    field("pageInfo"){
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
+                field("isFavourite")
+                field("isFavouriteBlocked")
+                field("isAdult")
+                field("nextAiringEpisode"){
+                    field("id")
+                    field("episode")
+                    field("airingAt")
+                }
+                field("airingSchedule"){
+                    field("nodes"){
+                        field("id")
+                        field("episode")
+                        field("airingAt")
+                    }
+                    field("pageInfo"){
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
+                field("trends"){
+                    field("nodes"){
+                        field("averageScore")
+                        field("popularity")
+                        field("inProgress")
+                        field("episode")
+                    }
+                    field("pageInfo"){
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
+                field("externalLinks"){
+                    field("site")
+                    field("url")
+                    field("type")
+                }
+                field("streamingEpisodes"){
+                    field("title")
+                    field("thumbnail")
+                    field("url")
+                    field("site")
+                }
+                field("rankings"){
+                    field("id")
+                    field("allTime")
+                    field("format")
+                    field("type")
+                    field("rank")
+                    field("year")
+                    field("season")
+
+                }
+                field("mediaListEntry"){
+                    field("id")
+                }
+                field("reviews"){
+                    field("nodes"){
+                        field("id")
+                    }
+                    field("pageInfo"){
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
+                field("recommendations"){
+                    field("nodes"){
+                        field("id")
+                        field("rating")
+                        field("userRating")
+                        field("mediaRecommendation"){
+                            field("id")
+                            field("title"){
+                                field("romaji"){
+                                    addArg("stylised", "true")
+                                }
+                                field("english"){
+                                    addArg("stylised", "true")
+                                }
+                                field("native"){
+                                    addArg("stylised", "true")
+                                }
+                                field("userPreferred")
+                            }
+                        }
+                    }
+                    field("pageInfo"){
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
+                field("stats"){
+                    field("scoreDistribution"){
+                        field("score")
+                        field("amount")
+                    }
+                    field("statusDistribution"){
+                        field("status")
+                        field("amount")
+                    }
+                }
+                field("siteUrl")
+                field("autoCreateForumThread")
+                field("isRecommendationBlocked")
+                field("isReviewBlocked")
+                field("modNotes")
             }
         }
-        val variables = buildJsonObject {
-            put("id", mediaId)
-        }
-        val result = gqlclient.sendMutation<JsonObject, AnilistGQLError>(
-            apiEndpoint, query, variables, headers = listOf(
-                HttpHeader("Authorization", "Bearer $token")
-            )
+        val variables = MediaVariables(
+            mediaId,
+            idMal,
+            startDate,
+            endDateInput,
+            season,
+            seasonYear,
+            type,
+            format,
+            status,
+            episodes,
+            duration,
+            chapters,
+            volumes,
+            isAdult,
+            genre,
+            tag,
+            minimumTagRank,
+            tagCategory,
+            onList,
+            licensedBy,
+            licensedById,
+            averageScore,
+            popularity,
+            source,
+            countryOfOrigin,
+            isLicensed,
+            search,
+            id_not,
+            id_in,
+            id_not_in,
+            idMal_in,
+            idMal_not_in,
+            startDate_greater,
+            startDate_lesser,
+            startDate_like,
+            endDate_greater,
+            endDate_lesser,
+            endDate_like,
+            format_in,
+            format_not,
+            format_not_in,
+            status_in,
+            status_not,
+            status_not_in,
+            episodes_greater,
+            duration_greater,
+            duration_lesser,
+            chapters_greater,
+            chapters_lesser,
+            volumes_greater,
+            volumes_lesser,
+            genre_in,
+            genre_not_in,
+            tag_in,
+            tag_not_in,
+            tagCategory_in,
+            tagCategory_not_in,
+            licensedById_in,
+            averageScore_not,
+            averageScore_greater,
+            averageScore_lesser,
+            popularity_not,
+            popularity_greater,
+            popularity_lesser,
+            source_in,
+            sort
         )
-        val error = result.errors
-        if (result.data==null&&error!=null){
-            val errorMessages = error.joinToString {
-                "Message: ${it.message}"
+        return send(query, filter = variables)
+    }
+
+    suspend fun getAnimeList(filter:MediaListFilter): MediaResult? {
+        val query = query {
+            field("MediaList"){
+                addArg("id", Variable("id", "Int"))
+                addArg("userId", Variable("userId", "Int"))
+                addArg("userName", Variable("userName", "String"))
+                addArg("type", Variable("type", "MediaType"))
+                addArg("mediaId", Variable("mediaId", "Int"))
+                addArg("isFollowing", Variable("isFollowing", "Boolean"))
+                addArg("notes", Variable("notes", "String"))
+                addArg("startedAt", Variable("startedAt", "FuzzyDateInt"))
+                addArg("completedAt", Variable("completedAt", "FuzzyDateInt"))
+                addArg("compareWithAuthList", Variable("compareWithAuthList", "Boolean"))
+                addArg("userId_in", Variable("userId_in", "[Int]"))
+                addArg("status_in", Variable("status_in", "[MediaListStatus]"))
+                addArg("status_not_in", Variable("status_not_in", "[MediaListStatus]"))
+                addArg("status_not", Variable("status_not", "MediaListStatus"))
+                addArg("mediaId_in", Variable("mediaId_in", "[Int]"))
+                addArg("mediaId_not_in", Variable("mediaId_not_in", "[Int]"))
+                addArg("notes_like", Variable("notes_like", "String"))
+                addArg("startedAt_greater", Variable("startedAt_greater", "FuzzyDateInt"))
+                addArg("startedAt_lesser", Variable("startedAt_lesser", "FuzzyDateInt"))
+                addArg("startedAt_like", Variable("startedAt_like", "String"))
+                addArg("completedAt_greater", Variable("completedAt_greater", "FuzzyDateInt"))
+                addArg("completedAt_lesser", Variable("completedAt_lesser", "FuzzyDateInt"))
+                addArg("completedAt_like", Variable("completedAt_like", "String"))
+                addArg("sort", Variable("sort", "[MediaListSort]"))
+                field("id")
+                field("userId")
+                field("mediaId")
+                field("status")
+                field("score")
+                field("progress")
+                field("progressVolumes")
+                field("repeat")
+                field("priority")
+                field("private")
+                field("notes")
+                field("hiddenFromStatusLists")
+                field("customLists")
+                field("advancedScores")
+                field("startedAt")
+                field("completedAt")
+                field("updatedAt")
+                field("createdAt")
+                field("media"){
+                    field("id")
+                    field("title"){
+                        field("romaji"){
+                            addArg("stylised", "true")
+                        }
+                        field("english"){
+                            addArg("stylised", "true")
+                        }
+                        field("native"){
+                            addArg("stylised", "true")
+                        }
+                        field("userPreferred")
+                    }
+                    field("coverImage"){
+                        field("extraLarge")
+                        field("large")
+                        field("medium")
+                        field("color")
+                    }
+                }
+                field("user")
             }
-            throw AnilistRequestException(errorMessages, error)
         }
-        return result.data?.get("deleted")?.jsonPrimitive?.boolean ?: false
+        return send(query, filter=filter)
+    }
+
+    suspend fun setStatus(mediaId:Int, status:MediaListStatus): MediaList? {
+        return updateAnime(mediaId, status)
     }
 }

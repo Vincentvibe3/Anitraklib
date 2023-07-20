@@ -80,7 +80,6 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("io.github.vincentvibe3:gqlclient:1.0.5")
-                implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
             }
         }
         val commonTest by getting {
@@ -96,25 +95,29 @@ kotlin {
                 implementation("io.ktor:ktor-client-darwin:$ktorVersion")
             }
         }
-            val macosArm64Test by getting {
+        val macosArm64Test by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-darwin:$ktorVersion")
             }
         }
 
-            val linuxX64Test by getting {
+        val linuxX64Test by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-cio:$ktorVersion")
             }
         }
 
-            val mingwX64Test by getting {
+        val mingwX64Test by getting {
             dependencies {
                 implementation("io.ktor:ktor-client-winhttp:$ktorVersion")
             }
         }
 
-        val jvmMain by getting
+        val jvmMain by getting {
+            dependencies {
+                implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
+            }
+        }
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test"))
