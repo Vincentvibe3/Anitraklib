@@ -743,6 +743,8 @@ class Anilist {
                             field("month")
                             field("day")
                         }
+                        field("notes")
+                        field("repeat")
                         field("updatedAt")
                         field("createdAt")
                         field("media"){
@@ -767,6 +769,7 @@ class Anilist {
                                 field("medium")
                                 field("color")
                             }
+                            field("isFavourite")
                         }
                     }
                     field("name")
