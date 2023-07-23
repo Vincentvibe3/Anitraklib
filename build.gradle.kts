@@ -1,15 +1,16 @@
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("multiplatform") version "1.8.21"
-    kotlin("plugin.serialization") version "1.8.21"
+    kotlin("multiplatform") version "1.9.0"
+    kotlin("plugin.serialization") version "1.9.0"
     id("org.jetbrains.dokka") version "1.8.10"
     id("publication-plugin")
     `maven-publish`
 }
 
 group = "io.github.vincentvibe3"
-version = "0.1.3-alpha"
+version = "0.1.4-alpha"
 
 repositories {
     mavenCentral()
@@ -80,6 +81,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("io.github.vincentvibe3:gqlclient:1.0.5")
+                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
             }
         }
         val commonTest by getting {
