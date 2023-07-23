@@ -251,7 +251,8 @@ data class AnilistUser(
     data class MediaListOptions(
         val animeList: MediaListTypeOption,
         val mangaList: MediaListTypeOption,
-        val scoreFormat: String
+        val scoreFormat: ScoreFormat,
+        val rowOrder:String,
     )
 
     @Serializable
