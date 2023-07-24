@@ -252,7 +252,7 @@ data class AnilistUser(
         val animeList: MediaListTypeOption,
         val mangaList: MediaListTypeOption,
         val scoreFormat: ScoreFormat,
-        val rowOrder:String,
+        val rowOrder:String?=null,
     )
 
     @Serializable
