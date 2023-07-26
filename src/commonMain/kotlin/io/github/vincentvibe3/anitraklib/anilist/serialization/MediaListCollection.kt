@@ -16,6 +16,6 @@ data class MediaListCollection(
         val name: String,
         val isCustomList: Boolean,
         val isSplitCompletedList: Boolean,
-        val status: MediaListStatus
+        val status: MediaListStatus?
     )
 }
