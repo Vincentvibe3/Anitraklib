@@ -55,6 +55,10 @@ class Anilist {
         }
 
         return if (result != null) {
+            val errors = result.errors
+            if (errors != null){
+                throw AnilistRequestException(errors)
+            }
             result.data ?: throw AnilistRequestException(result.errors!!)
         } else {
             throw IllegalStateException("You must pass either a query or mutation")
@@ -117,7 +121,7 @@ class Anilist {
         advancedScores: List<Float>? = null,
         startedAt: FuzzyDateInt? = null,
         completedAt: FuzzyDateInt? = null,
-    ): MediaList {
+    ): MediaList? {
         val mutation = mutation {
             field("SaveMediaListEntry") {
                 addArg("mediaId", Variable("mediaId", "Int"))
@@ -135,11 +139,11 @@ class Anilist {
                 addArg("advancedScores", Variable("advancedScores", "[Float]"))
                 addArg(
                     "startedAt",
-                    Variable("startedAt", "io.github.vincentvibe3.anilist.serialization.FuzzyDateInput")
+                    Variable("startedAt", "FuzzyDateInput")
                 )
                 addArg(
                     "completedAt",
-                    Variable("completedAt", "io.github.vincentvibe3.anilist.serialization.FuzzyDateInput")
+                    Variable("completedAt", "FuzzyDateInput")
                 )
                 field("userId")
                 field("id")
@@ -147,6 +151,7 @@ class Anilist {
                 field("mediaId")
             }
         }
+        println(mutation.toString())
         val variables = Json.encodeToJsonElement(
             UpdateAnimeVariables(
                 mediaId,
@@ -817,7 +822,7 @@ class Anilist {
         return send<MediaListCollectionResult>(query, variables = variables).MediaListCollection
     }
 
-    suspend fun setStatus(mediaId: Int, status: MediaListStatus): MediaList {
+    suspend fun setStatus(mediaId: Int, status: MediaListStatus): MediaList? {
         return updateAnime(mediaId, status)
     }
 }

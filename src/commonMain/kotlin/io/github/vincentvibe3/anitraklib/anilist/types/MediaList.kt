@@ -3,6 +3,7 @@ package io.github.vincentvibe3.anitraklib.anilist.types
 import io.github.vincentvibe3.anitraklib.anilist.serialization.AnilistUser
 import io.github.vincentvibe3.anitraklib.anilist.serialization.FuzzyDateInt
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
@@ -19,8 +20,8 @@ data class MediaList(
     val private: Boolean? = null,
     val notes: String? = null,
     val hiddenFromStatusLists: Boolean? = null,
-    val customLists: JsonObject? = null,
-    val advancedScores: JsonObject? = null,
+    val customLists: JsonElement? = null,
+    val advancedScores: JsonElement? = null,
     val startedAt: FuzzyDateInt? = null,
     val completedAt: FuzzyDateInt? = null,
     val updatedAt: Int? = null,

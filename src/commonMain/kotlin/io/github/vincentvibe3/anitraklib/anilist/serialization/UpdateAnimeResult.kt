@@ -5,5 +5,5 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class UpdateAnimeResult(
-    val SaveMediaListEntry: MediaList
+    val SaveMediaListEntry: MediaList?
 )
