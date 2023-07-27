@@ -151,7 +151,6 @@ class Anilist {
                 field("mediaId")
             }
         }
-        println(mutation.toString())
         val variables = Json.encodeToJsonElement(
             UpdateAnimeVariables(
                 mediaId,

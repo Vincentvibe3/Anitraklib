@@ -79,7 +79,7 @@ kotlin {
             dependencies {
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("io.github.vincentvibe3:gqlclient:1.0.5")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
             }
