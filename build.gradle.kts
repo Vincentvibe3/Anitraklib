@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "io.github.vincentvibe3"
-version = "0.1.9-alpha"
+version = "0.1.10-alpha"
 
 repositories {
     mavenCentral()
@@ -80,7 +80,7 @@ kotlin {
                 implementation("io.ktor:ktor-client-core:$ktorVersion")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
-                implementation("io.github.vincentvibe3:gqlclient:1.0.5")
+                implementation("io.github.vincentvibe3:gqlclient:1.0.7")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.4.0")
             }
         }

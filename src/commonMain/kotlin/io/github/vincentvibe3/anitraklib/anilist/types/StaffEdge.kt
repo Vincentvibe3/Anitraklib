@@ -7,5 +7,5 @@ data class StaffEdge(
     val node: Staff,
     val id: Int,
     val role: String,
-    val favouriteOrder: Int
+    val favouriteOrder: Int?=null
 )

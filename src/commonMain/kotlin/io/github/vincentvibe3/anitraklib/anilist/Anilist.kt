@@ -454,7 +454,41 @@ class Anilist {
                     field("category")
                     field("description")
                 }
+                field("studios"){
+                    field("nodes") {
+                        field("id")
+                        field("name")
+                        field("isAnimationStudio")
+                        field("siteUrl")
+                        field("isFavourite")
+                        field("favourites")
+                    }
+                    field("pageInfo") {
+                        field("total")
+                        field("perPage")
+                        field("currentPage")
+                        field("lastPage")
+                        field("hasNextPage")
+                    }
+                }
                 field("relations") {
+                    field("edges"){
+                        field("relationType")
+                        field("id")
+                        field("node"){
+                            field("id")
+                            field("title") {
+                                field("romaji")
+                                field("english")
+                                field("native")
+                                field("userPreferred")
+                            }
+                            field("format")
+                            field("coverImage"){
+                                field("medium")
+                            }
+                        }
+                    }
                     field("nodes") {
                         field("id")
                         field("title") {
@@ -473,6 +507,39 @@ class Anilist {
                     }
                 }
                 field("characters") {
+                    field("edges"){
+                        field("id")
+                        field("node"){
+                            field("id")
+                            field("image"){
+                                field("large")
+                                field("medium")
+                            }
+                            field("name") {
+                                field("first")
+                                field("middle")
+                                field("last")
+                                field("full")
+                                field("native")
+                                field("userPreferred")
+                            }
+                        }
+                        field("role")
+                        field("name")
+                        field("voiceActors"){
+                            addArg("sort", "RELEVANCE")
+                            field("id")
+                            field("languageV2")
+                            field("name") {
+                                field("first")
+                                field("middle")
+                                field("last")
+                                field("full")
+                                field("native")
+                                field("userPreferred")
+                            }
+                        }
+                    }
                     field("nodes") {
                         field("id")
                         field("name") {
@@ -493,6 +560,25 @@ class Anilist {
                     }
                 }
                 field("staff") {
+                    field("edges"){
+                        field("id")
+                        field("role")
+                        field("node"){
+                            field("id")
+                            field("name") {
+                                field("first")
+                                field("middle")
+                                field("last")
+                                field("full")
+                                field("native")
+                                field("userPreferred")
+                            }
+                            field("image"){
+                                field("medium")
+                                field("large")
+                            }
+                        }
+                    }
                     field("nodes") {
                         field("id")
                         field("name") {
@@ -538,6 +624,7 @@ class Anilist {
                         field("id")
                         field("episode")
                         field("airingAt")
+                        field("mediaId")
                     }
                     field("pageInfo") {
                         field("total")
@@ -584,7 +671,7 @@ class Anilist {
 
                 }
                 field("mediaListEntry") {
-                    field("id")
+                    useFragment(Fragments.mediaListEntry)
                 }
                 field("reviews") {
                     field("nodes") {
@@ -617,6 +704,12 @@ class Anilist {
                                 }
                                 field("userPreferred")
                             }
+                            field("coverImage"){
+                                field("medium")
+                                field("large")
+                                field("extraLarge")
+                                field("color")
+                            }
                         }
                     }
                     field("pageInfo") {
@@ -644,6 +737,7 @@ class Anilist {
                 field("modNotes")
             }
         }
+        println(query.toString())
         val variables = Json.encodeToJsonElement(
             MediaVariables(
                 mediaId,
@@ -743,58 +837,7 @@ class Anilist {
                 addArg("sort", Variable("sort", "[MediaListSort]"))
                 field("lists") {
                     field("entries") {
-                        field("id")
-                        field("userId")
-                        field("mediaId")
-                        field("status")
-                        field("score")
-                        field("progress")
-                        field("progressVolumes")
-                        field("repeat")
-                        field("priority")
-                        field("private")
-                        field("notes")
-                        field("hiddenFromStatusLists")
-                        field("customLists")
-                        field("advancedScores")
-                        field("startedAt") {
-                            field("year")
-                            field("month")
-                            field("day")
-                        }
-                        field("completedAt") {
-                            field("year")
-                            field("month")
-                            field("day")
-                        }
-                        field("notes")
-                        field("repeat")
-                        field("updatedAt")
-                        field("createdAt")
-                        field("media") {
-                            field("id")
-                            field("episodes")
-                            field("chapters")
-                            field("title") {
-                                field("romaji") {
-                                    addArg("stylised", "true")
-                                }
-                                field("english") {
-                                    addArg("stylised", "true")
-                                }
-                                field("native") {
-                                    addArg("stylised", "true")
-                                }
-                                field("userPreferred")
-                            }
-                            field("coverImage") {
-                                field("extraLarge")
-                                field("large")
-                                field("medium")
-                                field("color")
-                            }
-                            field("isFavourite")
-                        }
+                        useFragment(Fragments.mediaListEntry)
                     }
                     field("name")
                     field("isCustomList")

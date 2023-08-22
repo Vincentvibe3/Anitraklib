@@ -112,10 +112,10 @@ data class Media(
 
     @Serializable
     data class MediaCoverImage(
-        val extraLarge: String?,
-        val large: String?,
-        val medium: String?,
-        val color: String?
+        val extraLarge: String?=null,
+        val large: String?=null,
+        val medium: String?=null,
+        val color: String?=null
     )
 
     @Serializable

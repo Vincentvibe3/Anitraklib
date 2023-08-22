@@ -5,8 +5,8 @@ import kotlinx.serialization.Serializable
 data class AiringSchedule(
     val id: Int,
     val airingAt: Int,
-    val timeUntilAiring: Int,
+    val timeUntilAiring: Int?=null,
     val episode: Int,
-    val mediaId: Int,
+    val mediaId: Int?=null,
     val media: Media? = null
 )
