@@ -423,6 +423,7 @@ class Anilist {
                 field("isLicensed")
                 field("source")
                 field("hashtag")
+                field("isFavourite")
                 field("trailer") {
                     field("id")
                     field("site")
@@ -443,6 +444,7 @@ class Anilist {
                 field("popularity")
                 field("isLocked")
                 field("trending")
+                field("source")
                 field("favourites")
                 field("tags") {
                     field("id")
@@ -527,6 +529,7 @@ class Anilist {
                         field("role")
                         field("name")
                         field("voiceActors"){
+                            addArg("language", "JAPANESE")
                             addArg("sort", "RELEVANCE")
                             field("id")
                             field("languageV2")
@@ -653,6 +656,7 @@ class Anilist {
                     field("site")
                     field("url")
                     field("type")
+                    field("icon")
                 }
                 field("streamingEpisodes") {
                     field("title")
@@ -737,7 +741,6 @@ class Anilist {
                 field("modNotes")
             }
         }
-        println(query.toString())
         val variables = Json.encodeToJsonElement(
             MediaVariables(
                 mediaId,
