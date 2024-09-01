@@ -1,10 +1,9 @@
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("multiplatform") version "1.9.0"
-    kotlin("plugin.serialization") version "1.9.0"
-    id("org.jetbrains.dokka") version "1.8.10"
+    kotlin("multiplatform") version "2.0.0"
+    kotlin("plugin.serialization") version "2.0.0"
+    id("org.jetbrains.dokka") version "1.9.20"
     id("publication-plugin")
     `maven-publish`
 }
@@ -36,8 +35,9 @@ kotlin {
         }
     }
 
+    jvmToolchain(11)
+
     jvm {
-        jvmToolchain(11)
         withJava()
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -154,4 +154,22 @@ kotlin {
         }
     }
 
+}
+
+tasks.dokkaHtml.configure {
+    outputDirectory.set(project.projectDir.resolve("docs"))
+    dokkaSourceSets {
+        configureEach {
+            jdkVersion.set(17)
+        }
+    }
+}
+
+tasks.dokkaJavadoc.configure {
+    outputDirectory.set(buildDir.resolve("dokka/javadoc"))
+    dokkaSourceSets {
+        configureEach {
+            jdkVersion.set(17)
+        }
+    }
 }
